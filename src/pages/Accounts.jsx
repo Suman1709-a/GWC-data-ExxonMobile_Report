@@ -14,7 +14,7 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
       "Is_Effective",
       "Is_Not_Effective",
       "Is_Not_Assessed",
-      
+      "ID",
     ],
     []
   );
@@ -22,10 +22,42 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
   const fetchProgram = useCallback(async () => {
     try {
       const data = await Domo.get(
-        `/data/v1/Exxon_data?groupby=${fields.join()}`
+        `/data/v1/Exxon_data?groupby=${fields.join()}&unique=ID&fields=${fields.join()}`
       );
-        console.log("program data", data);
-      setProgramData(data);
+      const grouped = {};
+
+      data.forEach((row) => {
+        const key = row.ID; // Group only by ID
+
+        if (!grouped[key]) {
+          grouped[key] = {
+            ...row,
+            Is_Effective: 0,
+            Is_Not_Effective: 0,
+            Is_Not_Assessed: 0,
+            LSRA_List: [], // optional: collect LSRA values
+          };
+        }
+
+        // Count effectiveness
+        if (row.Safeguard_Effectiveness === "Is Effective") {
+          grouped[key].Is_Effective += 1;
+        } else if (row.Safeguard_Effectiveness === "Is Not Effective") {
+          grouped[key].Is_Not_Effective += 1;
+        } else if (row.Safeguard_Effectiveness === "Is Not Assessed") {
+          grouped[key].Is_Not_Assessed += 1;
+        }
+
+        // Optional: track all LSRA values for this ID
+        if (!grouped[key].LSRA_List.includes(row.LSRA)) {
+          grouped[key].LSRA_List.push(row.LSRA);
+        }
+      });
+
+      const finalResult = Object.values(grouped);
+      console.log("Final Result:", finalResult);
+
+      setProgramData(finalResult);
       return data;
     } catch (error) {
       console.error("Error fetching Account data:", error);
@@ -42,7 +74,6 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
   useEffect(() => {
     fetchProgram();
   }, [fetchProgram]);
-  
 
   const columnDefs = [
     {
@@ -50,7 +81,7 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
       field: "LSRA",
       cellStyle: { textAlign: "left" },
       minWidth: 350,
-        flex: 1,
+      flex: 1,
 
       width: 150,
       sortable: true,
@@ -59,7 +90,7 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
       headerName: "Effective",
       field: "Is_Effective",
       minWidth: 200,
-        flex: 1,
+      flex: 1,
 
       width: 250,
       filter: true,
@@ -69,7 +100,7 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
       headerName: "Not_Effective",
       field: "Is_Not_Effective",
       minWidth: 200,
-        flex: 1,
+      flex: 1,
 
       width: 230,
       filter: true,
@@ -79,7 +110,7 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
       headerName: "Not_Assessed",
       field: "Is_Not_Assessed",
       minWidth: 200,
-        flex: 1,
+      flex: 1,
 
       width: 220,
       filter: true,
@@ -98,23 +129,28 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
   ];
 
   const cards = useMemo(() => {
-    // const programTotal = programData?.reduce( (sum, item) => sum + (item.Program_Total || 0), 0 );
-    const Is_Effective = programData?.reduce(
-      (sum, item) => sum + (item.Is_Effective || 0),
-      0
+    // Count distinct IDs where Safeguard_Effectiveness matches each condition
+    const uniqueEffectiveIds = new Set(
+      programData
+        ?.filter((item) => item.Safeguard_Effectiveness === "Is Effective")
+        .map((item) => item.ID)
     );
-    const Is_Not_Effective = programData?.reduce(
-      (sum, item) => sum + (item.Is_Not_Effective || 0),
-      0
+
+    const uniqueNotEffectiveIds = new Set(
+      programData
+        ?.filter((item) => item.Safeguard_Effectiveness === "Is Not Effective")
+        .map((item) => item.ID)
     );
-    const Is_Not_Assessed = programData?.reduce(
-      (sum, item) => sum + (item.Is_Not_Assessed || 0),
-      0
+
+    const uniqueNotAssessedIds = new Set(
+      programData
+        ?.filter((item) => item.Safeguard_Effectiveness === "Is Not Assessed")
+        .map((item) => item.ID)
     );
-    const pcCount = programData?.reduce(
-      (sum, item) => sum + (item.PC_Count || 0),
-      0
-    );
+
+    const Is_Effective = uniqueEffectiveIds.size;
+    const Is_Not_Effective = uniqueNotEffectiveIds.size;
+    const Is_Not_Assessed = uniqueNotAssessedIds.size;
 
     return [
       {
@@ -122,14 +158,10 @@ function Accounts({ activeCard, setActiveCard, Card, ActionsRenderer }) {
         title: "Total V&V",
         kpiKey: programData?.length,
         data: {
-          "Program specific": {
-            // "Program Total": programTotal,
+          "": {
             Effective: Is_Effective,
-            Not_Effective: Is_Not_Effective,
-          },
-          "Coverage specific": {
-          Not_Assessed: Is_Not_Assessed,
-            PC: pcCount,
+            "Not Effective": Is_Not_Effective,
+            "Not Assessed": Is_Not_Assessed,
           },
         },
       },
