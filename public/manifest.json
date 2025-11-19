@@ -1,0 +1,20 @@
+{
+  "name": "ExxonMobile Report",
+  "version": "1.0.0",
+  "size": {
+    "width": 3,
+    "height": 3
+  },
+  "mapping": [
+    {
+      "dataSetId": "b3fef93b-fc86-4ffb-8ba3-185c9bac8b35",
+      "alias": "Exxon_data",
+      "fields": []
+    }
+  ],
+  "collections": [],
+  "workflowMapping": [],
+  "packagesMapping": [],
+  "id": "fcfc2d96-66f9-437c-92d3-7755b4da6528",
+  "proxyId": "81b76cec-5096-44f0-9897-a3bbb1848cd2"
+}
